@@ -12,21 +12,22 @@ class S(Enum):
 MIN = S.OFF
 MAX = S.MIDDLE
 
+def now():
+    return datetime.now()
+
+def get_sunset():
+    return get_time(SUNSET_TIMES[now().month - 1])
+
+
 # sunset times for 12 months
 # generator here: ./get-sun-times.py
 SUNSET_TIMES = ['16:07', '17:02', '18:05', '19:08', '20:09', '21:03', '21:16', '20:34', '19:22', '18:03', '16:48', '16:01']
 
-state = S.OFF # todo: определять по времени суток
-
-def now():
-    return datetime.now()
+state = S.STRIPE if now() >= get_sunset() else S.OFF
 
 def get_time(string):
     [hour, minute] = string.split(':')
     return now().replace(hour = hour, minute = minute)
-
-def get_sunset():
-    return get_time(SUNSET_TIMES[now().month - 1])
 
 def onSig(dir):
     dimm(+1 if dir == 'R' else -1)
@@ -40,7 +41,7 @@ def changed_manually_recently():
 # brighter / darken
 def dimm(delta):
     level = state.value + delta
-    if level > MAX.value || level < MIN.value:
+    if level > MAX.value or level < MIN.value:
         ser.write("vE") # error feedback
     else:
         state = Color(level)
