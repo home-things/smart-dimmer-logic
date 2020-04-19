@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 import serial
 
@@ -59,22 +59,25 @@ def set_state(next_state):
 
 # brighter / darken
 def dimm(state):
-    global latest_manual_action_time
-    latest_manual_action_time = now()
+    global latest_action_time
+    latest_action_time = now()
     for i in [1, 2]: # lamp levels
         send(str(i) + ('H' if state.value >= i else 'L'))
 
-def changed_manually_recently():
-    return (now() - latest_manual_action_time).seconds <= 30 * 60 # todo
+def changed_recently():
+    return (now() - latest_action_time).seconds <= 30 * 60 # todo
 
 
 # sunset times for 12 months
 # generator is here: ./get-sun-times.py
 SUNSET_TIMES = ['16:07', '17:02', '18:05', '19:08', '20:09', '21:03', '21:16', '20:34', '19:22', '18:03', '16:48', '16:01']
 
-state = S.STRIPE if now() >= get_sunset() else S.OFF
+if (now() < get_sunset() + timedelta(hours = 3) and now() >= get_time('08:40')):
+    state = S.STRIPE 
+else:
+    state = S.OFF
 dimm(state)
-latest_manual_action_time = datetime.min
+latest_action_time = datetime.min
 
 print(f"Initial state: {state}")
 
@@ -90,27 +93,27 @@ while True:
         print(f"command: '{command}'")
         inc_state(+1 if command == "turn R" else -1)
         dimm(state)
-        print(f"has changed recently?: {changed_manually_recently()}")
+        print(f"has changed recently?: {changed_recently()}")
         print(f"state: {state}")
 
-    elif not changed_manually_recently():
-        if state == S.OFF and now() > get_time('08:40'):
+    elif not changed_recently():
+        if state == S.OFF and now() == get_time('08:40'):
             inc_state(+1)
             dimm(state)
             print("dimmed up automatically: good morning")
 
-        elif now() >= get_sunset():
+        elif now() == get_sunset():
             inc_state(+1)
             dimm(state)
             print("dimmed up automatically: good evening")
 
-        elif now() >= get_sunset() + 3:
+        elif now() == get_sunset() + timedelta(hours = 3):
             if state.value > S.STRIPE.value:
                 set_state(S.STRIPE)
                 dimm(state)
                 print("dimmed down automatically: good evening")
 
-        elif now() >= get_sunset() + 5:
+        elif now() == get_sunset() + timedelta(hours = 5):
             if state.value > S.STRIPE.value:
                 set_state(S.OFF)
                 dimm(state)
