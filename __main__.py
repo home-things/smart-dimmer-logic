@@ -1,6 +1,9 @@
+import os
 from datetime import datetime, timedelta
 from enum import Enum
 import serial
+
+DIR = os.path.dirname(os.path.abspath(__file__))
 
 # fix rpi uart before: https://www.raspberrypi.org/documentation/configuration/uart.md
 # timeout -- that's why readline() get full command string at once
@@ -41,8 +44,18 @@ def get_time(string):
 def now():
     return datetime.now()
 
+def now_minute():
+    return now().replace(second=0, microsecond=0)
+
+def today():
+    return now().replace(hour=0, minute=0, second=0, microsecond=0)
+
 def get_sunset():
     return get_time(SUNSET_TIMES[now().month - 1])
+
+def store(lamp_no, is_on):
+    with open(f"{DIR}/.state/{lamp_no}", 'w+') as f:
+        f.write('on' if is_on else 'off')
 
 # brighter / darken
 def inc_state(delta):
@@ -62,7 +75,9 @@ def dimm(state):
     global latest_action_time
     latest_action_time = now()
     for i in [1, 2]: # lamp levels
-        send(str(i) + ('H' if state.value >= i else 'L'))
+        is_on = state.value >= i
+        send(str(i) + ('H' if is_on else 'L'))
+        store(i, is_on)
 
 def changed_recently():
     return (now() - latest_action_time).seconds <= 30 * 60 # todo
@@ -97,23 +112,23 @@ while True:
         print(f"state: {state}")
 
     elif not changed_recently():
-        if state == S.OFF and now() == get_time('08:40'):
+        if state == S.OFF and now_minute() == get_time('08:40'):
             inc_state(+1)
             dimm(state)
             print("dimmed up automatically: good morning")
 
-        elif now() == get_sunset():
+        elif now_minute() == get_sunset():
             inc_state(+1)
             dimm(state)
             print("dimmed up automatically: good evening")
 
-        elif now() == get_sunset() + timedelta(hours = 3):
+        elif now_minute() == get_sunset() + timedelta(hours = 3):
             if state.value > S.STRIPE.value:
                 set_state(S.STRIPE)
                 dimm(state)
                 print("dimmed down automatically: good evening")
 
-        elif now() == get_sunset() + timedelta(hours = 5):
+        elif now_minute() == get_sunset() + timedelta(hours = 5):
             if state.value > S.STRIPE.value:
                 set_state(S.OFF)
                 dimm(state)
