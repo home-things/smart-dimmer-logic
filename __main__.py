@@ -39,7 +39,7 @@ def recv():
 
 def get_time(string):
     [hour, minute] = string.split(':')
-    return now().replace(hour = int(hour), minute = int(minute))
+    return now().replace(hour = int(hour), minute = int(minute), second=0, microsecond=0)
 
 def now():
     return datetime.now()
