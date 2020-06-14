@@ -88,7 +88,7 @@ def store(lamp_no, is_on):
 
 # immutable
 def inc_state(delta, is_auto):
-    level = state.value + delta
+    level = state.value + delta.value
     if level > MAX.value or level < MIN.value:
         if not is_auto: send('vB') # error feedback
         return state
@@ -114,7 +114,7 @@ def _dimm(new_state):
         send(str(i) + ('H' if is_on else 'L'))
         store(i, is_on)
 
-# +1 = brighter / -1 = darken
+# @param {D.UP|D.DOWN} delta
 def inc_dimm(delta, is_auto):
     new_state = inc_state(delta, is_auto)
     print(f"inc_dimm. state: {state}, new: {new_state}")
@@ -126,12 +126,12 @@ def inc_dimm(delta, is_auto):
 def inc_dimm_to(new_state, delta, is_auto):
     global state
     if new_state == state: return
-    if (delta > 0) != (new_state.value > state.value): return
+    if (delta.value > 0) != (new_state.value > state.value): return
     new_state = inc_state(delta, is_auto)
     _dimm(new_state)
 
 def changed_recently():
-    return (now() - latest_action_time).seconds <= 30 * 60 # todo
+    return (now() - latest_action_time).seconds <= 15 * 60
 
 def ensure_trigger(name):
     if rule_triggered.get(name) == True: return False
@@ -164,29 +164,35 @@ while True:
 
     if command in ["turn L", "turn R"]:
         print(f"command: '{command}'")
-        inc_dimm(+1 if command == "turn R" else -1, is_auto = True)
+        inc_dimm(D.UP if command == "turn R" else D.DOWN, is_auto = True)
         print(f"has changed recently?: {changed_recently()}")
         print(f"state: {state}")
 
-    elif not changed_recently():
-        if now_minute() >= get_sunset() + timedelta(hours = 5):
-            if ensure_trigger('good_night'): 
-                inc_dimm_to(S.OFF, D.DOWN, is_auto = True)
-                print("dimmed down automatically: good night")
+    # Выключение на ночь делаем даже если недавно был включен свет
+    if now_minute() >= get_time('00:30') and now_minute() <= get_time('02:30'): #get_sunset() + timedelta(hours = 5):
+        if ensure_trigger('good_night'): 
+            inc_dimm_to(S.OFF, D.DOWN, is_auto = True)
+            print("dimmed down automatically: good night")
 
-        elif now_minute() >= get_sunset() + timedelta(hours = 3):
+    elif now_minute() >= get_time('23:30'): #get_sunset() + timedelta(hours = 5):
+        if ensure_trigger('good_night'): 
+            inc_dimm_to(S.OFF, D.DOWN, is_auto = True)
+            print("dimmed down automatically: good night")
+
+    elif not changed_recently():
+        if now_minute() >= get_sunset() + timedelta(hours = 3):
             if ensure_trigger('good_evening'): 
                 inc_dimm_to(S.STRIPE, D.UP, is_auto = True)
                 print("dimmed down automatically: good evening")
 
 #        elif now_minute() >= get_sunset():
 #            if ensure_trigger('good_day'): 
-#                inc_dimm(+1, is_auto = True)
+#                inc_dimm(D.UP, is_auto = True)
 #                print("dimmed up automatically: good evening")
 
         elif now_minute() >= get_time('08:40'):
             if ensure_trigger('morning'): 
-                inc_dimm_to(S.STRIPE, +1, is_auto = True)
+                inc_dimm_to(S.STRIPE, D.UP, is_auto = True)
                 print("dimmed up automatically: good morning")
 
 
