@@ -118,7 +118,7 @@ def _dimm(new_state):
         send(str(i) + ('H' if is_on else 'L'))
         store(i, is_on)
         print("[mqtt] publishing state...")
-        mqttc.publish(MQTT_TOPIC_STATE, (state.value / 2 * 255), retain=True)
+        mqttc.publish(MQTT_TOPIC_STATE, (state.value / 2 * 256 - 1), retain=True)
         mqttc.publish(MQTT_TOPIC_SW_STATE, 'ON' if state.value > 0 else 'OFF', retain=True)
         print("[mqtt] published")
 
