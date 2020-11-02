@@ -169,7 +169,12 @@ while True:
         print(f"state: {state}")
 
     # Выключение на ночь делаем даже если недавно был включен свет
-    if now_minute() >= get_time('00:30') and now_minute() <= get_time('02:30'): #get_sunset() + timedelta(hours = 5):
+    if now_minute() >= get_time('01:30') and now_minute() <= get_time('03:30'): #get_sunset() + timedelta(hours = 5):
+        if ensure_trigger('good_night'): 
+            inc_dimm_to(S.OFF, D.DOWN, is_auto = True)
+            print("dimmed down automatically: good night")
+
+    elif now_minute() >= get_time('00:30') and now_minute() <= get_time('02:30'): #get_sunset() + timedelta(hours = 5):
         if ensure_trigger('good_night'): 
             inc_dimm_to(S.OFF, D.DOWN, is_auto = True)
             print("dimmed down automatically: good night")
