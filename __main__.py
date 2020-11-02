@@ -119,7 +119,7 @@ def _dimm(new_state):
         store(i, is_on)
         print("[mqtt] publishing state...")
         mqttc.publish(MQTT_TOPIC_STATE, (state.value), retain=True)
-        mqttc.publish(MQTT_TOPIC_SW_STATE, 'ON' if state.value > 0 else 'OFf', retain=True)
+        mqttc.publish(MQTT_TOPIC_SW_STATE, 'ON' if state.value > 0 else 'OFF', retain=True)
         print("[mqtt] published")
 
 # @param {D.UP|D.DOWN} delta
