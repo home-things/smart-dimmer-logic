@@ -181,11 +181,13 @@ print("[mqtt] initing...")
 mqttc = mqtt.Client(client_id = "smart-dimmer-bedroom1", clean_session = False)
 
 def on_message(mqttc, userdata, message):
-    print("%s %s" % (message.topic, message.payload))
     if message.topic == MQTT_TOPIC_CMD:
       print('[mqtt] >> dimm', message.payload)
     elif message.topic == MQTT_TOPIC_SW_CMD:
-      print('[mqtt] >> ON|OFF', message.payload) 
+        print('[mqtt] >> switch', message.payload)
+        _dimm(S.OFF if message.payload == 'OFF' else s.STRIPE)
+    else:
+        print("%s %s" % (message.topic, message.payload))
 
 def on_connect(mqttc, userdata, flags, rc):
     global latest_action_time
