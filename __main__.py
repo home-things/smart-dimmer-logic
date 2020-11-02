@@ -185,7 +185,7 @@ def on_message(mqttc, userdata, message):
       print('[mqtt] >> dimm', message.payload)
     elif message.topic == MQTT_TOPIC_SW_CMD:
         print('[mqtt] >> switch', message.payload)
-        _dimm(S.OFF if message.payload == 'OFF' else s.STRIPE)
+        _dimm(S.OFF if message.payload == 'OFF' else S.STRIPE)
     else:
         print("%s %s" % (message.topic, message.payload))
 
