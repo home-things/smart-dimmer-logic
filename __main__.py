@@ -183,7 +183,10 @@ mqttc = mqtt.Client(client_id = "smart-dimmer-bedroom1", clean_session = False)
 
 def on_message(mqttc, userdata, message):
     if message.topic == MQTT_TOPIC_CMD:
-      print('[mqtt] >> dimm', message.payload)
+        print('[mqtt] >> dimm', message.payload)
+        new_state = S(int(message.payload))
+        _dimm(new_state)
+      
     elif message.topic == MQTT_TOPIC_SW_CMD:
         should_off = message.payload == b'OFF'
         print('[mqtt] >> switch', message.payload)
@@ -192,6 +195,7 @@ def on_message(mqttc, userdata, message):
         else:
             new_status = S.OFF if should_off else S.STRIPE
             _dimm(S.OFF if should_off else S.STRIPE)
+    
     else:
         print("%s %s" % (message.topic, message.payload))
 
