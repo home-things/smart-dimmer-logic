@@ -164,7 +164,7 @@ while True:
 
     if command in ["turn L", "turn R"]:
         print(f"command: '{command}'")
-        inc_dimm(D.UP if command == "turn R" else D.DOWN, is_auto = True)
+        inc_dimm(D.UP if command == "turn R" else D.DOWN, is_auto = False)
         print(f"has changed recently?: {changed_recently()}")
         print(f"state: {state}")
 
