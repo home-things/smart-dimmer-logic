@@ -117,9 +117,10 @@ def _dimm(new_state):
         is_on = new_state.value >= i
         send(str(i) + ('H' if is_on else 'L'))
         store(i, is_on)
-        print("publishing state over mqtt...")
+        print("[mqtt] publishing state...")
         mqttc.publish(MQTT_TOPIC_STATE, (state.value), retain=True)
         mqttc.publish(MQTT_TOPIC_SW_STATE, 'ON' if state.value > 0 else 'OFf', retain=True)
+        print("[mqtt] published")
 
 # @param {D.UP|D.DOWN} delta
 def inc_dimm(delta, is_auto):
@@ -184,8 +185,13 @@ def on_message(mqttc, userdata, message):
     if message.topic == MQTT_TOPIC_CMD:
       print('[mqtt] >> dimm', message.payload)
     elif message.topic == MQTT_TOPIC_SW_CMD:
-        print('[mqtt] >> switch', message.payload, message.payload == b'OFF', S.OFF if message.payload == b'OFF' else S.STRIPE)
-        _dimm(S.OFF if message.payload == b'OFF' else S.STRIPE)
+        should_off = message.payload == b'OFF'
+        print('[mqtt] >> switch', message.payload)
+        if not should_off and state != S.OFF:
+            print('pass', state)
+        else:
+            new_status = S.OFF if should_off else S.STRIPE
+            _dimm(S.OFF if should_off else S.STRIPE)
     else:
         print("%s %s" % (message.topic, message.payload))
 
