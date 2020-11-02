@@ -88,7 +88,7 @@ def get_sunset():
 
 def store(lamp_no, is_on):
     with open(f"{DIR}/.state/{lamp_no}", 'w+') as f:
-        f.write('ON' if is_on else 'OFf')
+        f.write('ON' if is_on else 'OFF')
 
 # immutable
 def inc_state(delta, is_auto):
