@@ -110,6 +110,13 @@ def _dimm(new_state):
     global latest_action_time
     if state == new_state: return
 
+    print("[mqtt] publishing state...")
+    if (state == S.OFF) != (new_state == S.OFF): # turned ON / OFF
+        mqttc.publish(MQTT_TOPIC_SW_STATE, 'ON' if new_state.value > 0 else 'OFF', retain=True)
+    else:
+        mqttc.publish(MQTT_TOPIC_STATE, new_state.value, retain=True)
+    print("[mqtt] published")
+
     state = new_state
     latest_action_time = now()
 
@@ -117,10 +124,6 @@ def _dimm(new_state):
         is_on = new_state.value >= i
         send(str(i) + ('H' if is_on else 'L'))
         store(i, is_on)
-        print("[mqtt] publishing state...")
-        mqttc.publish(MQTT_TOPIC_STATE, (state.value / 2 * 256 - 1), retain=True)
-        mqttc.publish(MQTT_TOPIC_SW_STATE, 'ON' if state.value > 0 else 'OFF', retain=True)
-        print("[mqtt] published")
 
 # @param {D.UP|D.DOWN} delta
 def inc_dimm(delta, is_auto):
