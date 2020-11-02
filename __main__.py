@@ -3,15 +3,19 @@ from datetime import datetime, timedelta
 from enum import Enum
 import serial
 from threading import Timer
+import paho.mqtt.client as mqtt
+from time import sleep
 
 DIR = os.path.dirname(os.path.abspath(__file__))
+MQTT_DOMAIN = '192.168.1.68' #'rpi4.local'
+MQTT_TOPIC_STATE = "bedroom/light/state" # >> 0 | 1 | 2
+MQTT_TOPIC_SW_STATE = "bedroom/light/switch_state" # >> ON | OFF
+MQTT_TOPIC_CMD = "bedroom/light/dimm" # << 0 | 1 | 2
+MQTT_TOPIC_SW_CMD = "bedroom/light/switch" # << ON | OFF
 
-# fix rpi uart before: https://www.raspberrypi.org/documentation/configuration/uart.md
-# timeout -- that's why readline() get full command string at once
-ser = serial.Serial('/dev/ttyAMA0', 9600, timeout=1, bytesize=serial.EIGHTBITS)
-PRINT_SER = True
+latest_action_time = datetime.fromtimestamp(0).min # epoch 
+is_mqtt_connected = False
 
-print(f"connected to: {ser.portstr}")
 
 class S(Enum):
     UNKNOWN = -1
@@ -84,7 +88,7 @@ def get_sunset():
 
 def store(lamp_no, is_on):
     with open(f"{DIR}/.state/{lamp_no}", 'w+') as f:
-        f.write('on' if is_on else 'off')
+        f.write('ON' if is_on else 'OFf')
 
 # immutable
 def inc_state(delta, is_auto):
@@ -113,6 +117,9 @@ def _dimm(new_state):
         is_on = new_state.value >= i
         send(str(i) + ('H' if is_on else 'L'))
         store(i, is_on)
+        print("publishing state over mqtt...")
+        mqttc.publish(MQTT_TOPIC_STATE, (state.value), retain=True)
+        mqttc.publish(MQTT_TOPIC_SW_STATE, 'ON' if state.value > 0 else 'OFf', retain=True)
 
 # @param {D.UP|D.DOWN} delta
 def inc_dimm(delta, is_auto):
@@ -131,6 +138,7 @@ def inc_dimm_to(new_state, delta, is_auto):
     _dimm(new_state)
 
 def changed_recently():
+    global latest_action_time
     return (now() - latest_action_time).seconds <= 15 * 60
 
 def ensure_trigger(name):
@@ -139,6 +147,13 @@ def ensure_trigger(name):
     rule_triggered[name] = True
     return True
 
+
+
+#
+# INIT
+#
+
+
 # sunset times for 12 months
 # generator is here: ./get-sun-times.py
 SUNSET_TIMES = ['16:07', '17:02', '18:05', '19:08', '20:09', '21:03', '21:16', '20:34', '19:22', '18:03', '16:48', '16:01']
@@ -146,20 +161,75 @@ SUNSET_TIMES = ['16:07', '17:02', '18:05', '19:08', '20:09', '21:03', '21:16', '
 state = S.UNKNOWN
 prev_state = state
 
-if (now() < get_sunset() + timedelta(hours = 3) and now() >= get_time('08:40')):
-    new_state = S.STRIPE 
-else:
-    new_state = S.OFF
-_dimm(new_state)
-latest_action_time = datetime.min
 
-print(f"Initial state: {state}")
+#
+# === Serial
+
+# First Run Note: fix rpi uart before: https://www.raspberrypi.org/documentation/configuration/uart.md
+# timeout -- that's why readline() get full command string at once
+ser = serial.Serial('/dev/ttyAMA0', 9600, timeout=1, bytesize=serial.EIGHTBITS)
+PRINT_SER = True
+
+print(f"connected to: {ser.portstr}")
+
+
+
+#
+# === MQTT
+
+print("[mqtt] initing...")
+mqttc = mqtt.Client(client_id = "smart-dimmer-bedroom1", clean_session = False)
+
+def on_message(mqttc, userdata, message):
+    print("%s %s" % (message.topic, message.payload))
+    if message.topic == MQTT_TOPIC_CMD:
+      print('[mqtt] >> dimm', message.payload)
+    elif message.topic == MQTT_TOPIC_SW_CMD:
+      print('[mqtt] >> ON|OFF', message.payload) 
+
+def on_connect(mqttc, userdata, flags, rc):
+    global latest_action_time
+    global is_mqtt_connected
+
+    print("Connected with result code "+str(rc))
+    print(f"[mqtt] subscribing... {MQTT_TOPIC_CMD}")
+    mqttc.subscribe(MQTT_TOPIC_CMD)
+    mqttc.subscribe(MQTT_TOPIC_SW_CMD)
+    print("[mqtt] subscribed")
+    
+    #
+    # State init
+    print("initialize controller device status...")
+    if (now() < get_sunset() + timedelta(hours = 3) and now() >= get_time('08:40')):
+        new_state = S.STRIPE 
+    else:
+        new_state = S.OFF
+    _dimm(new_state)
+    latest_action_time = datetime.min
+
+    print(f"Initial state: {state}")
+    is_mqtt_connected = True
+
+
+mqttc.enable_logger(logger=None)
+mqttc.on_connect = on_connect
+mqttc.on_message = on_message
+print("[mqtt] connecting...")
+mqttc.connect(MQTT_DOMAIN)
+
+# mqttc.loop_forever()
+mqttc.loop_start() # loop thread
+
 
 #
 # main
 #
 
 while True:
+    #mqttc.loop() # process new mqtt messages
+    #sleep(.01)
+    if not is_mqtt_connected: continue 
+
     command = recv()
 
     if command in ["turn L", "turn R"]:
