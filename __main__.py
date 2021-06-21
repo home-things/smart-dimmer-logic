@@ -9,7 +9,8 @@ from time import sleep
 DIR = os.path.dirname(os.path.abspath(__file__))
 MQTT_DOMAIN = '192.168.1.68' # 'rpi4.local'
 MQTT_TOPIC_STATE = "bedroom/light/state" # >> 0 | 1 | 2
-MQTT_TOPIC_STATE_DIFF = "bedroom/light/diff_state" # >> 0 | 1 | 2
+MQTT_TOPIC_STATE_DIFF = "bedroom/light/diff_state" # >> + | -
+MQTT_TOPIC_STATE_AUX = "bedroom/light/aux_state" # >> turn_main_on | turn_all_off
 
 MQTT_TOPIC_SW_STATE = "bedroom/light/switch_state" # >> ON | OFF
 MQTT_TOPIC_CMD = "bedroom/light/dimm" # << 0 | 1 | 2
@@ -24,6 +25,7 @@ class S(Enum):
     OFF = 0
     STRIPE = 1
     MIDDLE = 2
+    MAIN = 3
 MIN = S.OFF
 MAX = S.MIDDLE
 
@@ -92,11 +94,22 @@ def store(lamp_no, is_on):
     with open(f"{DIR}/.state/{lamp_no}", 'w+') as f:
         f.write('ON' if is_on else 'OFF')
 
+def turn_main_on():
+    mqttc.publish(MQTT_TOPIC_STATE_AUX, 'turn_main_on', retain=True)
+
+def turn_all_off():
+    mqttc.publish(MQTT_TOPIC_STATE_AUX, 'turn_all_off', retain=True)
+
 # immutable
 def inc_state(delta, is_auto):
     level = state.value + delta.value
-    if level > MAX.value or level < MIN.value:
-        if not is_auto: send('vB') # error feedback
+    if level > MAX.value:
+        #if not is_auto: send('vB') # error feedback
+        turn_main_on()
+        return state
+    elif level < MIN.value:
+        #if not is_auto: send('vB') # error feedback
+        turn_all_off()
         return state
     else:
         return S(level)
@@ -190,8 +203,12 @@ mqttc = mqtt.Client(client_id = "smart-dimmer-bedroom1", clean_session = False)
 def on_message(mqttc, userdata, message):
     if message.topic == MQTT_TOPIC_CMD:
         print('[mqtt] >> dimm', message.payload)
-        new_state = S(int(message.payload))
-        _dimm(new_state)
+        try:
+            new_state = S(int(message.payload))
+            _dimm(new_state)
+        except:
+            print('incorrect cmd', message.payload)
+            pass
       
     elif message.topic == MQTT_TOPIC_SW_CMD:
         should_off = message.payload == b'OFF'
