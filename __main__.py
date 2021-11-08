@@ -7,7 +7,7 @@ import paho.mqtt.client as mqtt
 from time import sleep
 
 DIR = os.path.dirname(os.path.abspath(__file__))
-MQTT_DOMAIN = '192.168.1.68' # 'rpi4.local'
+MQTT_DOMAIN = '192.168.31.241' # 'rpi4.local'
 MQTT_TOPIC_STATE = "bedroom/light/state" # >> 0 | 1 | 2
 MQTT_TOPIC_STATE_DIFF = "bedroom/light/diff_state" # >> + | -
 MQTT_TOPIC_STATE_AUX = "bedroom/light/aux_state" # >> turn_main_on | turn_all_off
@@ -95,10 +95,10 @@ def store(lamp_no, is_on):
         f.write('ON' if is_on else 'OFF')
 
 def turn_main_on():
-    mqttc.publish(MQTT_TOPIC_STATE_AUX, 'turn_main_on', retain=True)
+    mqttc.publish(MQTT_TOPIC_STATE_AUX, 'turn_main_on', retain=False)
 
 def turn_all_off():
-    mqttc.publish(MQTT_TOPIC_STATE_AUX, 'turn_all_off', retain=True)
+    mqttc.publish(MQTT_TOPIC_STATE_AUX, 'turn_all_off', retain=False)
 
 # immutable
 def inc_state(delta, is_auto):
@@ -130,7 +130,7 @@ def _dimm(new_state):
         mqttc.publish(MQTT_TOPIC_SW_STATE, 'ON' if new_state.value > 0 else 'OFF', retain=True)
     else:
         mqttc.publish(MQTT_TOPIC_STATE, new_state.value, retain=True)
-        mqttc.publish(MQTT_TOPIC_STATE_DIFF, '+' if new_state.value > state.value else '-', retain=True)
+        mqttc.publish(MQTT_TOPIC_STATE_DIFF, '+' if new_state.value > state.value else '-', retain=False)
     print("[mqtt] published")
 
     state = new_state
